@@ -1,4 +1,4 @@
-name: Web Security Scan
+name: Tier 1 Security Checks
 
 on:
   workflow_dispatch:
@@ -11,6 +11,13 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - github.com
+          - badssl.com
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,19 +27,33 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Run scanner
+      - name: Run security header, redirect and certificate checks
         env:
-          TARGET_URL: ${{ secrets.TARGET_URL }}
+          TARGET_URL: https://${{ matrix.target }}
         run: python scanner.py
 
-      - name: Upload report
+      - name: Install TLS testing tool
+        run: |
+          git clone --depth 1 https://github.com/testssl/testssl.sh.git
+          chmod +x testssl.sh/testssl.sh
+
+      - name: Check supported TLS versions and ciphers
+        run: |
+          mkdir -p reports
+          ./testssl.sh/testssl.sh \
+            --fast \
+            --warnings off \
+            --logfile "reports/tls-${{ matrix.target }}.log" \
+            "${{ matrix.target }}:443"
+
+      - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: security-scan-report
+          name: tier1-report-${{ matrix.target }}
           path: reports/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 30
