@@ -32,7 +32,7 @@ jobs:
 
       - name: Run security header, redirect and certificate checks
         env:
-          TARGET_URL: https://${{ matrix.target }}
+          TARGET_URL: ${{ secrets.TARGET_URL }}
         run: python scanner.py
 
       - name: Install TLS testing tool
